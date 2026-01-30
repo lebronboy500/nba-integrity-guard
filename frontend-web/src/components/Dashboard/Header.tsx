@@ -1,10 +1,14 @@
 import React from 'react';
 
+type Page = 'dashboard' | 'trading' | 'analytics' | 'settings';
+
 interface HeaderProps {
   isConnected: boolean;
+  currentPage: Page;
+  onPageChange: (page: Page) => void;
 }
 
-export default function Header({ isConnected }: HeaderProps) {
+export default function Header({ isConnected, currentPage, onPageChange }: HeaderProps) {
   return (
     <header className="border-b border-dark-border glass sticky top-0 z-50">
       <div className="container mx-auto px-6 py-4">
@@ -46,10 +50,30 @@ export default function Header({ isConnected }: HeaderProps) {
 
             {/* Navigation */}
             <nav className="flex items-center gap-1">
-              <NavButton active>Dashboard</NavButton>
-              <NavButton>Trades</NavButton>
-              <NavButton>Analytics</NavButton>
-              <NavButton>Settings</NavButton>
+              <NavButton
+                active={currentPage === 'dashboard'}
+                onClick={() => onPageChange('dashboard')}
+              >
+                Dashboard
+              </NavButton>
+              <NavButton
+                active={currentPage === 'trading'}
+                onClick={() => onPageChange('trading')}
+              >
+                Trading
+              </NavButton>
+              <NavButton
+                active={currentPage === 'analytics'}
+                onClick={() => onPageChange('analytics')}
+              >
+                Analytics
+              </NavButton>
+              <NavButton
+                active={currentPage === 'settings'}
+                onClick={() => onPageChange('settings')}
+              >
+                Settings
+              </NavButton>
             </nav>
           </div>
         </div>
@@ -60,13 +84,16 @@ export default function Header({ isConnected }: HeaderProps) {
 
 function NavButton({
   children,
-  active = false
+  active = false,
+  onClick
 }: {
   children: React.ReactNode;
   active?: boolean;
+  onClick: () => void;
 }) {
   return (
     <button
+      onClick={onClick}
       className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
         active
           ? 'bg-primary-500/10 text-primary-400 border border-primary-500/20'

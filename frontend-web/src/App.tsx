@@ -1,17 +1,21 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import DashboardPage from './components/Dashboard/DashboardPage';
+import TradingPage from './components/Trading/TradingPage';
+import AnalyticsPage from './components/Analytics/AnalyticsPage';
+import SettingsPage from './components/Settings/SettingsPage';
 import Header from './components/Dashboard/Header';
-import StatsCard from './components/Dashboard/StatsCard';
-import SignalPanel from './components/Dashboard/SignalPanel';
-import RealTimeChart from './components/Dashboard/RealTimeChart';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useSignalStore } from './store/signalStore';
 import { useStatsStore } from './store/statsStore';
 
+type Page = 'dashboard' | 'trading' | 'analytics' | 'settings';
+
 function App() {
+  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const { signals, addSignal } = useSignalStore();
   const { stats, updateStats } = useStatsStore();
 
-  const { isConnected, lastMessage } = useWebSocket({
+  const { isConnected } = useWebSocket({
     url: 'ws://localhost:3000',
     onMessage: (data) => {
       console.log('[App] WebSocket message received:', data);
@@ -48,84 +52,17 @@ function App() {
 
   return (
     <div className="min-h-screen bg-dark-bg">
-      <Header isConnected={isConnected} />
+      <Header
+        isConnected={isConnected}
+        currentPage={currentPage}
+        onPageChange={setCurrentPage}
+      />
 
       <main className="container mx-auto px-6 py-8">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <StatsCard
-            title="Rigging Index"
-            value={stats.currentRiggingIndex}
-            format="number"
-            trend={stats.currentRiggingIndex > 0.5 ? 'up' : 'neutral'}
-            color={stats.currentRiggingIndex > 0.7 ? 'danger' : 'warning'}
-            subtitle="Current suspicion level"
-          />
-          <StatsCard
-            title="Anomaly Score"
-            value={stats.currentAnomalyScore}
-            format="number"
-            trend={stats.currentAnomalyScore > 0.6 ? 'up' : 'neutral'}
-            color={stats.currentAnomalyScore > 0.8 ? 'danger' : 'warning'}
-            subtitle="Market irregularities"
-          />
-          <StatsCard
-            title="Active Signals"
-            value={signals.filter(s => s.status === 'active').length}
-            format="number"
-            trend="neutral"
-            color="primary"
-            subtitle={`${stats.signalsProcessed} total processed`}
-          />
-          <StatsCard
-            title="Win Rate"
-            value={stats.winRate}
-            format="percentage"
-            trend={stats.winRate > 0.6 ? 'up' : 'down'}
-            color={stats.winRate > 0.6 ? 'primary' : 'danger'}
-            subtitle={`${stats.tradesGenerated} trades executed`}
-          />
-        </div>
-
-        {/* Signal Panel */}
-        <div className="mb-8">
-          <SignalPanel signals={signals} />
-        </div>
-
-        {/* Real-Time Chart */}
-        <div className="mb-8">
-          <RealTimeChart data={signals} />
-        </div>
-
-        {/* Additional Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="card">
-            <h3 className="text-sm font-medium text-slate-400 mb-2">
-              Total Profit
-            </h3>
-            <p className="text-2xl font-bold text-primary-400">
-              ${stats.totalProfit.toLocaleString()}
-            </p>
-          </div>
-          <div className="card">
-            <h3 className="text-sm font-medium text-slate-400 mb-2">
-              Distributions
-            </h3>
-            <p className="text-2xl font-bold text-slate-100">
-              {stats.distributionsExecuted}
-            </p>
-          </div>
-          <div className="card">
-            <h3 className="text-sm font-medium text-slate-400 mb-2">
-              System Errors
-            </h3>
-            <p className={`text-2xl font-bold ${
-              stats.totalErrors > 0 ? 'text-danger-400' : 'text-primary-400'
-            }`}>
-              {stats.totalErrors}
-            </p>
-          </div>
-        </div>
+        {currentPage === 'dashboard' && <DashboardPage />}
+        {currentPage === 'trading' && <TradingPage />}
+        {currentPage === 'analytics' && <AnalyticsPage />}
+        {currentPage === 'settings' && <SettingsPage />}
       </main>
 
       {/* Footer */}
