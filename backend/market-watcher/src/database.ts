@@ -1,6 +1,6 @@
 /**
- * Database Manager for Market Watcher
- * Handles PostgreSQL connections and data storage
+ * Database Manager for Market Watcher - Phase 1 Enhanced
+ * Handles PostgreSQL connections and data storage with health checks
  */
 
 import { Pool, PoolClient } from 'pg';
@@ -19,24 +19,63 @@ export interface MarketData {
 
 export class DatabaseManager {
   private pool: Pool | null = null;
+  private readonly maxRetries = 3;
+  private stats = { inserts: 0, errors: 0 };
 
   async connect(): Promise<void> {
-    try {
-      this.pool = new Pool({
-        host: process.env.POSTGRES_HOST || 'localhost',
-        port: parseInt(process.env.POSTGRES_PORT || '5432'),
-        database: process.env.POSTGRES_DB || 'nba_integrity',
-        user: process.env.POSTGRES_USER || 'admin',
-        password: process.env.POSTGRES_PASSWORD || 'password',
-      });
+    let lastError: Error | null = null;
 
-      // Test connection
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      try {
+        this.pool = new Pool({
+          host: process.env.POSTGRES_HOST || 'localhost',
+          port: parseInt(process.env.POSTGRES_PORT || '5432'),
+          database: process.env.POSTGRES_DB || 'nba_integrity',
+          user: process.env.POSTGRES_USER || 'admin',
+          password: process.env.POSTGRES_PASSWORD || 'password',
+          max: 10,
+          idleTimeoutMillis: 30000,
+          connectionTimeoutMillis: 5000,
+        });
+
+        // Test connection
+        const client = await this.pool.connect();
+        console.log(`✓ Connected to PostgreSQL (attempt ${attempt})`);
+        client.release();
+        return;
+      } catch (error) {
+        lastError = error as Error;
+        console.warn(`⚠️ Connection attempt ${attempt}/${this.maxRetries} failed: ${error}`);
+
+        if (attempt < this.maxRetries) {
+          const waitTime = Math.pow(2, attempt - 1) * 1000;
+          console.log(`⏳ Retrying in ${waitTime}ms...`);
+          await this.sleep(waitTime);
+        }
+      }
+    }
+
+    throw new Error(`Failed to connect after ${this.maxRetries} attempts: ${lastError?.message}`);
+  }
+
+  async ping(): Promise<boolean> {
+    if (!this.pool) {
+      return false;
+    }
+
+    try {
       const client = await this.pool.connect();
-      console.log('Connected to PostgreSQL database');
+      await client.query('SELECT 1');
       client.release();
+      return true;
     } catch (error) {
-      console.error('Error connecting to database:', error);
-      throw error;
+      console.warn(`⚠️ Database ping failed: ${error}`);
+      try {
+        await this.connect();
+        return true;
+      } catch {
+        return false;
+      }
     }
   }
 
@@ -65,10 +104,15 @@ export class DatabaseManager {
         data.timestamp,
       ]);
 
-      console.log(`Inserted market data for ${data.market_id}`);
+      this.stats.inserts++;
+      console.log(
+        `✓ Inserted market data: ${data.market_id} | ` +
+        `Anomaly: ${data.anomaly_detected} (${data.anomaly_score.toFixed(4)})`
+      );
       return true;
     } catch (error) {
-      console.error('Error inserting market data:', error);
+      this.stats.errors++;
+      console.error('❌ Error inserting market data:', error);
       return false;
     }
   }
@@ -89,15 +133,23 @@ export class DatabaseManager {
       const result = await this.pool.query(query, [marketId, limit]);
       return result.rows;
     } catch (error) {
-      console.error('Error fetching market data:', error);
+      console.error('❌ Error fetching market data:', error);
       return [];
     }
+  }
+
+  getStats() {
+    return this.stats;
   }
 
   async close(): Promise<void> {
     if (this.pool) {
       await this.pool.end();
-      console.log('Database connection closed');
+      console.log(`✓ Database closed | Stats: ${JSON.stringify(this.stats)}`);
     }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }

@@ -37,14 +37,33 @@ export class DatabaseManager {
         database: process.env.POSTGRES_DB || 'nba_integrity',
         user: process.env.POSTGRES_USER || 'admin',
         password: process.env.POSTGRES_PASSWORD || 'password',
+        max: 10,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 5000,
       });
 
       const client = await this.pool.connect();
-      console.log('Connected to PostgreSQL database');
+      console.log('✓ Connected to PostgreSQL database');
       client.release();
     } catch (error) {
-      console.error('Error connecting to database:', error);
+      console.error('❌ Error connecting to database:', error);
       throw error;
+    }
+  }
+
+  async ping(): Promise<boolean> {
+    if (!this.pool) {
+      return false;
+    }
+
+    try {
+      const client = await this.pool.connect();
+      await client.query('SELECT 1');
+      client.release();
+      return true;
+    } catch (error) {
+      console.warn('⚠️ Database ping failed:', error);
+      return false;
     }
   }
 
