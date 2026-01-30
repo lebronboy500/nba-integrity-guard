@@ -20,33 +20,27 @@ export default function StatsCard({
 }: StatsCardProps) {
   const formattedValue = formatValue(value, format);
   const colorClass = getColorClass(color);
-  const trendIcon = getTrendIcon(trend);
 
   return (
     <div className="card">
-      <div className="flex flex-col gap-2">
-        {/* Title */}
-        <h3 className="text-sm font-medium text-slate-400">{title}</h3>
-
-        {/* Value */}
-        <div className="flex items-baseline gap-2">
-          <span className={`text-3xl font-bold ${colorClass}`}>
-            {formattedValue}
+      <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">
+        {title}
+      </h3>
+      <div className="flex items-baseline gap-2">
+        <span className={`text-2xl font-bold ${colorClass}`}>
+          {formattedValue}
+        </span>
+        {trend !== 'neutral' && (
+          <span className={`text-xs ${
+            trend === 'up' ? 'text-primary-400' : 'text-danger-400'
+          }`}>
+            {trend === 'up' ? '↑' : '↓'}
           </span>
-          {trend !== 'neutral' && (
-            <span className={`text-sm ${
-              trend === 'up' ? 'text-primary-400' : 'text-danger-400'
-            }`}>
-              {trendIcon}
-            </span>
-          )}
-        </div>
-
-        {/* Subtitle */}
-        {subtitle && (
-          <p className="text-xs text-slate-500">{subtitle}</p>
         )}
       </div>
+      {subtitle && (
+        <p className="text-xs text-slate-500 mt-2">{subtitle}</p>
+      )}
     </div>
   );
 }

@@ -13,12 +13,13 @@
 }
 
 @layer components {
+  /* Minimalist card - no shadow, subtle border */
   .card {
-    @apply bg-dark-surface rounded-lg border border-dark-border p-6;
+    @apply bg-dark-surface rounded-lg border border-dark-border/50 p-6;
   }
 
   .card-hover {
-    @apply card hover:bg-dark-hover transition-colors cursor-pointer;
+    @apply card hover:border-dark-border transition-colors cursor-pointer;
   }
 
   .btn {
@@ -34,11 +35,11 @@
   }
 
   .btn-secondary {
-    @apply btn bg-dark-surface hover:bg-dark-hover border border-dark-border;
+    @apply btn bg-dark-surface hover:bg-dark-hover border border-dark-border/50;
   }
 
   .input {
-    @apply bg-dark-surface border border-dark-border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500;
+    @apply bg-dark-surface border border-dark-border/50 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500;
   }
 
   .badge {
@@ -46,25 +47,25 @@
   }
 
   .badge-success {
-    @apply badge bg-primary-500/10 text-primary-400 border border-primary-500/20;
+    @apply badge bg-primary-500/15 text-primary-400 border border-primary-500/30;
   }
 
   .badge-danger {
-    @apply badge bg-danger-500/10 text-danger-400 border border-danger-500/20;
+    @apply badge bg-danger-500/15 text-danger-400 border border-danger-500/30;
   }
 
   .badge-warning {
-    @apply badge bg-yellow-500/10 text-yellow-400 border border-yellow-500/20;
+    @apply badge bg-yellow-500/15 text-yellow-400 border border-yellow-500/30;
   }
 
   .badge-neutral {
-    @apply badge bg-slate-500/10 text-slate-400 border border-slate-500/20;
+    @apply badge bg-slate-500/15 text-slate-400 border border-slate-500/30;
   }
 }
 
 @layer utilities {
   .glass {
-    @apply bg-dark-surface/50 backdrop-blur-sm;
+    @apply bg-dark-surface/30 backdrop-blur-sm border border-dark-border/30;
   }
 
   .text-gradient {
@@ -72,37 +73,35 @@
   }
 }
 
-/* Range slider styling */
+/* Minimalist range slider */
 input[type="range"].slider {
   appearance: none;
   -webkit-appearance: none;
   width: 100%;
-  height: 8px;
+  height: 6px;
   background: #334155;
   outline: none;
-  border-radius: 5px;
+  border-radius: 3px;
 }
 
 input[type="range"].slider::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   background: #10b981;
   cursor: pointer;
   border-radius: 50%;
-  border: 2px solid #0f172a;
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+  border: none;
 }
 
 input[type="range"].slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   background: #10b981;
   cursor: pointer;
   border-radius: 50%;
-  border: 2px solid #0f172a;
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+  border: none;
 }
 
 input[type="range"].slider::-webkit-slider-thumb:hover {
@@ -113,7 +112,7 @@ input[type="range"].slider::-moz-range-thumb:hover {
   background: #059669;
 }
 
-/* Animations */
+/* Minimalist animations */
 @keyframes slide-in-right {
   from {
     transform: translateX(100%);
@@ -136,7 +135,7 @@ input[type="range"].slider::-moz-range-thumb:hover {
 
 @keyframes slide-up {
   from {
-    transform: translateY(20px);
+    transform: translateY(12px);
     opacity: 0;
   }
   to {
@@ -150,14 +149,14 @@ input[type="range"].slider::-moz-range-thumb:hover {
 }
 
 .animate-fade-in {
-  animation: fade-in 0.4s ease-out;
+  animation: fade-in 0.3s ease-out;
 }
 
 .animate-slide-up {
-  animation: slide-up 0.5s ease-out;
+  animation: slide-up 0.3s ease-out;
 }
 
 /* Additional badge styles */
 .badge-blue {
-  @apply badge bg-blue-500/10 text-blue-400 border border-blue-500/20;
+  @apply badge bg-blue-500/15 text-blue-400 border border-blue-500/30;
 }
