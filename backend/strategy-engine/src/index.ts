@@ -8,6 +8,9 @@ import { config } from 'dotenv';
 import { SignalMatcher } from './signals';
 import { QueueManager } from './queue';
 import { DatabaseManager } from './database';
+import { MLService } from './ml/service';
+import { BacktestEngine } from './backtest/engine';
+import { initializeBacktestTables } from './backtest/schema';
 
 config();
 
@@ -21,6 +24,8 @@ app.use(express.json());
 const signalMatcher = new SignalMatcher();
 const queueManager = new QueueManager();
 const db = new DatabaseManager();
+const mlService = new MLService(db);
+const backtestEngine = new BacktestEngine(db);
 
 // Global state
 let isRunning = false;
@@ -190,6 +195,165 @@ app.post('/distribution', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * ML: Evaluate signal with adaptive thresholds
+ * POST /ml/evaluate
+ * Body: { gameId, riggingIndex, anomalyScore }
+ */
+app.post('/ml/evaluate', async (req: Request, res: Response) => {
+  try {
+    const { gameId, riggingIndex, anomalyScore } = req.body;
+
+    if (!gameId || riggingIndex === undefined || anomalyScore === undefined) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const evaluation = await mlService.evaluateSignal(gameId, riggingIndex, anomalyScore);
+
+    res.json({
+      success: true,
+      evaluation
+    });
+  } catch (error) {
+    console.error('Error evaluating signal:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * ML: Get threshold statistics
+ * GET /ml/thresholds
+ */
+app.get('/ml/thresholds', async (req: Request, res: Response) => {
+  try {
+    const stats = await mlService.getThresholdStats();
+
+    res.json({
+      success: true,
+      stats
+    });
+  } catch (error) {
+    console.error('Error fetching threshold stats:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * ML: Force threshold update
+ * POST /ml/thresholds/update
+ */
+app.post('/ml/thresholds/update', async (req: Request, res: Response) => {
+  try {
+    const thresholds = await mlService.updateThresholds();
+
+    res.json({
+      success: true,
+      thresholds
+    });
+  } catch (error) {
+    console.error('Error updating thresholds:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * Backtest: Run backtest simulation
+ * POST /backtest/run
+ * Body: { config: { startDate, endDate, initialCapital, ... } }
+ */
+app.post('/backtest/run', async (req: Request, res: Response) => {
+  try {
+    const { config } = req.body;
+
+    if (!config || !config.startDate || !config.endDate || !config.initialCapital) {
+      return res.status(400).json({ error: 'Missing required configuration' });
+    }
+
+    // Set defaults
+    const backtestConfig = {
+      startDate: config.startDate,
+      endDate: config.endDate,
+      initialCapital: config.initialCapital,
+      maxPositionSize: config.maxPositionSize || 1000,
+      riskPerTrade: config.riskPerTrade || 0.02,
+      riggingThreshold: config.riggingThreshold || 0.65,
+      anomalyThreshold: config.anomalyThreshold || 0.75
+    };
+
+    console.log('[Backtest] Starting with config:', backtestConfig);
+
+    const result = await backtestEngine.run(backtestConfig);
+
+    // Save to database (optional)
+    // await db.saveBacktestResult(result);
+
+    res.json({
+      success: true,
+      result
+    });
+  } catch (error) {
+    console.error('Error running backtest:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * Backtest: Generate report
+ * POST /backtest/report
+ * Body: { result: BacktestResult }
+ */
+app.post('/backtest/report', async (req: Request, res: Response) => {
+  try {
+    const { result } = req.body;
+
+    if (!result) {
+      return res.status(400).json({ error: 'Missing backtest result' });
+    }
+
+    const report = backtestEngine.generateReport(result);
+
+    res.json({
+      success: true,
+      report
+    });
+  } catch (error) {
+    console.error('Error generating report:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * Stats: Get system statistics
+ * GET /stats
+ */
+app.get('/stats', async (req: Request, res: Response) => {
+  try {
+    // Get various stats
+    const recentTrades = await db.getRecentTrades(100);
+    const completedTrades = recentTrades.filter((t: any) => t.status === 'COMPLETED');
+    const profitableTrades = completedTrades.filter((t: any) => (t.profit || 0) > 0);
+
+    const stats = {
+      signalsProcessed: await db.query('SELECT COUNT(*) FROM twitter_data WHERE rigging_index IS NOT NULL').then(r => parseInt(r.rows[0].count)),
+      tradesGenerated: recentTrades.length,
+      distributionsExecuted: await db.query('SELECT COUNT(*) FROM distributions WHERE status = \'COMPLETED\'').then(r => parseInt(r.rows[0].count)),
+      totalErrors: 0, // TODO: Implement error tracking
+      currentRiggingIndex: 0.5, // TODO: Get from latest signal
+      currentAnomalyScore: 0.6, // TODO: Get from latest signal
+      winRate: completedTrades.length > 0 ? profitableTrades.length / completedTrades.length : 0,
+      totalProfit: completedTrades.reduce((sum: number, t: any) => sum + (t.profit || 0), 0)
+    };
+
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Initialize and start server
 async function start() {
   try {
@@ -198,12 +362,17 @@ async function start() {
     // Connect to database
     await db.connect();
 
+    // Initialize backtest tables
+    await initializeBacktestTables(db);
+
     // Setup queue workers
     queueManager.setupWorkers();
 
     // Start server
     app.listen(port, () => {
       console.log(`Strategy Engine listening on port ${port}`);
+      console.log(`ML Service: Adaptive Thresholds enabled`);
+      console.log(`Backtest Engine: Ready`);
       isRunning = true;
     });
   } catch (error) {
