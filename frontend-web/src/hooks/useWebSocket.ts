@@ -70,6 +70,12 @@ export function useWebSocket({
   }, [url, autoReconnect, reconnectInterval, onMessage, onOpen, onClose, onError]);
 
   useEffect(() => {
+    // Skip connection if URL is empty (mock data mode)
+    if (!url) {
+      console.log('[WebSocket] Skipped connection (empty URL)');
+      return;
+    }
+
     connect();
 
     return () => {
@@ -80,7 +86,7 @@ export function useWebSocket({
         wsRef.current.close();
       }
     };
-  }, [connect]);
+  }, [url, connect]);
 
   const sendMessage = useCallback((message: any) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

@@ -5,19 +5,30 @@ import AnalyticsPage from './components/Analytics/AnalyticsPage';
 import SettingsPage from './components/Settings/SettingsPage';
 import Header from './components/Dashboard/Header';
 import { useWebSocket } from './hooks/useWebSocket';
+import { useMockData } from './hooks/useMockData';
 import { useSignalStore } from './store/signalStore';
 import { useStatsStore } from './store/statsStore';
 
 type Page = 'dashboard' | 'trading' | 'analytics' | 'settings';
 
+// Use mock data for local development (no backend required)
+const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA !== 'false';
+
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
-  const { signals, addSignal } = useSignalStore();
-  const { stats, updateStats } = useStatsStore();
+  const { addSignal } = useSignalStore();
+  const { updateStats } = useStatsStore();
 
+  // Load mock data for local testing
+  useMockData(USE_MOCK_DATA);
+
+  // Connect to WebSocket only if not using mock data
   const { isConnected } = useWebSocket({
-    url: 'ws://localhost:3000',
+    url: USE_MOCK_DATA ? '' : 'ws://localhost:3000', // Empty URL skips connection
+    autoReconnect: !USE_MOCK_DATA,
     onMessage: (data) => {
+      if (USE_MOCK_DATA) return; // Ignore if using mock data
+
       console.log('[App] WebSocket message received:', data);
 
       // Handle different message types
@@ -35,8 +46,10 @@ function App() {
     }
   });
 
-  // Fetch initial stats on mount
+  // Fetch initial stats on mount (only if not using mock data)
   useEffect(() => {
+    if (USE_MOCK_DATA) return;
+
     const fetchStats = async () => {
       try {
         const response = await fetch('http://localhost:3000/stats');
@@ -52,8 +65,17 @@ function App() {
 
   return (
     <div className="min-h-screen bg-dark-bg">
+      {/* Mock Data Banner */}
+      {USE_MOCK_DATA && (
+        <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-6 py-2">
+          <p className="text-center text-sm text-yellow-400">
+            🧪 <strong>Mock Data Mode</strong> - Using simulated data for testing. Set VITE_USE_MOCK_DATA=false to connect to backend.
+          </p>
+        </div>
+      )}
+
       <Header
-        isConnected={isConnected}
+        isConnected={USE_MOCK_DATA ? true : isConnected}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
       />
