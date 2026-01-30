@@ -3,12 +3,17 @@ import { Trade } from '@/types';
 import { useTradeStore } from '@/store/tradeStore';
 import { formatCurrency, formatDateTime, formatRelativeTime } from '@/utils/format';
 import { apiService } from '@/services/api';
+import TradeModal from './TradeModal';
+import { useToast } from '@/components/Toast/ToastProvider';
 
 export default function TradingPage() {
   const { trades, addTrade } = useTradeStore();
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'PENDING' | 'EXECUTED' | 'COMPLETED' | 'FAILED'>('all');
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'profit'>('date');
+  const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchTrades();
@@ -19,16 +24,22 @@ export default function TradingPage() {
       setLoading(true);
       const response = await apiService.getTrades(100);
       response.data.forEach(trade => addTrade(trade));
+      showToast('success', 'Trades loaded successfully');
     } catch (error) {
       console.error('[TradingPage] Failed to fetch trades:', error);
+      showToast('error', 'Failed to load trades');
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredTrades = trades.filter(trade =>
-    filter === 'all' ? true : trade.status === filter
-  );
+  const filteredTrades = trades
+    .filter(trade => filter === 'all' ? true : trade.status === filter)
+    .filter(trade =>
+      searchQuery === '' ||
+      trade.gameId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      trade.id.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   const sortedTrades = [...filteredTrades].sort((a, b) => {
     switch (sortBy) {
@@ -55,59 +66,80 @@ export default function TradingPage() {
 
       {/* Filters and Actions */}
       <div className="card">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col gap-4">
           {/* Filter Buttons */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <FilterButton
-              active={filter === 'all'}
-              onClick={() => setFilter('all')}
-            >
-              All
-            </FilterButton>
-            <FilterButton
-              active={filter === 'PENDING'}
-              onClick={() => setFilter('PENDING')}
-            >
-              Pending
-            </FilterButton>
-            <FilterButton
-              active={filter === 'EXECUTED'}
-              onClick={() => setFilter('EXECUTED')}
-            >
-              Executed
-            </FilterButton>
-            <FilterButton
-              active={filter === 'COMPLETED'}
-              onClick={() => setFilter('COMPLETED')}
-            >
-              Completed
-            </FilterButton>
-            <FilterButton
-              active={filter === 'FAILED'}
-              onClick={() => setFilter('FAILED')}
-            >
-              Failed
-            </FilterButton>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <FilterButton
+                active={filter === 'all'}
+                onClick={() => setFilter('all')}
+              >
+                All
+              </FilterButton>
+              <FilterButton
+                active={filter === 'PENDING'}
+                onClick={() => setFilter('PENDING')}
+              >
+                Pending
+              </FilterButton>
+              <FilterButton
+                active={filter === 'EXECUTED'}
+                onClick={() => setFilter('EXECUTED')}
+              >
+                Executed
+              </FilterButton>
+              <FilterButton
+                active={filter === 'COMPLETED'}
+                onClick={() => setFilter('COMPLETED')}
+              >
+                Completed
+              </FilterButton>
+              <FilterButton
+                active={filter === 'FAILED'}
+                onClick={() => setFilter('FAILED')}
+              >
+                Failed
+              </FilterButton>
+            </div>
+
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-slate-400">Sort by:</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="input text-sm"
+              >
+                <option value="date">Date</option>
+                <option value="amount">Amount</option>
+                <option value="profit">Profit</option>
+              </select>
+              <button
+                onClick={fetchTrades}
+                className="btn-secondary text-sm"
+              >
+                Refresh
+              </button>
+            </div>
           </div>
 
-          {/* Sort Dropdown */}
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-slate-400">Sort by:</label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="input text-sm"
+          {/* Search Bar */}
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by Game ID or Trade ID..."
+              className="input w-full pl-10"
+            />
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
             >
-              <option value="date">Date</option>
-              <option value="amount">Amount</option>
-              <option value="profit">Profit</option>
-            </select>
-            <button
-              onClick={fetchTrades}
-              className="btn-secondary text-sm"
-            >
-              Refresh
-            </button>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
           </div>
         </div>
       </div>
@@ -175,13 +207,24 @@ export default function TradingPage() {
               </thead>
               <tbody>
                 {sortedTrades.map((trade) => (
-                  <TradeRow key={trade.id} trade={trade} />
+                  <TradeRow
+                    key={trade.id}
+                    trade={trade}
+                    onClick={() => setSelectedTrade(trade)}
+                  />
                 ))}
               </tbody>
             </table>
           </div>
         )}
       </div>
+
+      {/* Trade Modal */}
+      <TradeModal
+        trade={selectedTrade!}
+        isOpen={selectedTrade !== null}
+        onClose={() => setSelectedTrade(null)}
+      />
     </div>
   );
 }
@@ -226,7 +269,7 @@ function StatCard({
   );
 }
 
-function TradeRow({ trade }: { trade: Trade }) {
+function TradeRow({ trade, onClick }: { trade: Trade; onClick: () => void }) {
   const getStatusBadge = (status: Trade['status']) => {
     switch (status) {
       case 'PENDING':
@@ -247,7 +290,10 @@ function TradeRow({ trade }: { trade: Trade }) {
   };
 
   return (
-    <tr className="border-b border-dark-border hover:bg-dark-hover transition-colors">
+    <tr
+      onClick={onClick}
+      className="border-b border-dark-border hover:bg-dark-hover transition-colors cursor-pointer"
+    >
       <td className="py-3 px-4">
         <span className="font-mono text-xs text-slate-400">
           {trade.id.slice(0, 8)}...
