@@ -1,0 +1,26 @@
+{
+  "name": "nba-integrity-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for NBA Integrity Guard",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy": "hardhat run scripts/deploy.ts --network polygonAmoy",
+    "deploy:local": "hardhat run scripts/deploy.ts --network hardhat"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@typechain/ethers-v6": "^11.1.2",
+    "@typechain/hardhat": "^9.1.0",
+    "@types/chai": "^4.3.11",
+    "@types/mocha": "^10.0.6",
+    "chai": "^4.3.10",
+    "ethers": "^6.10.0",
+    "hardhat": "^2.19.4",
+    "typechain": "^8.3.2",
+    "typescript": "^5.3.3",
+    "dotenv": "^16.3.1"
+  }
+}
