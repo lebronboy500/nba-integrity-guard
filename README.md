@@ -43,6 +43,18 @@ A Web3 integrity monitoring and automated hedging system for NBA games on Polygo
 - CLI终端实时展示系统运行状态
 - 显示最新舆情指标、异常分数、交易记录
 
+### 🔗 **链上数据解码与验证** ✨ NEW
+- **EventDecoder**: 解析 Polymarket 交易事件（OrderFilled, TokenTransfer）
+- **DataValidator**: 多层验证（签名、区块确认、数据一致性、异常检测）
+- **异常模式检测**: 自动识别高频交易、自成交、价格操纵、洗售交易
+- **详细文档**: [链上验证与激励设计文档](./ONCHAIN_VALIDATION_INCENTIVES.md)
+
+### 💰 **用户激励与防作恶机制** ✨ NEW
+- **ReputationSystem**: 基于预测准确率、交易量的动态信誉评分（0-100分）
+- **AntiFraudSystem**: 质押机制、自动罚没、社区投票争议解决
+- **高分奖励**: 信誉分数 ≥70分 享受 1.5x 奖励倍数
+- **预言机集成**: UMA Optimistic Oracle V3 验证市场结果
+
 ---
 
 ## 🚀 演示地址 / GitHub
@@ -61,9 +73,12 @@ A Web3 integrity monitoring and automated hedging system for NBA games on Polygo
 | **RPC** | https://rpc-amoy.polygon.technology |
 | **Explorer** | https://amoy.polygonscan.com |
 | **合约地址 (IntegrityVault)** | *待部署* |
+| **合约地址 (ReputationSystem)** | *待部署* |
+| **合约地址 (AntiFraudSystem)** | *待部署* |
 | **计价单位** | MATIC |
 
 > 💡 提示：在 `.env` 中配置你的 `POLYGON_RPC_URL` 和 `PRIVATE_KEY` 以部署合约
+> 📖 详细的链上验证和激励机制设计，请查看 [完整文档](./ONCHAIN_VALIDATION_INCENTIVES.md)
 
 ---
 

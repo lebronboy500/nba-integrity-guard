@@ -168,22 +168,6 @@ BEGIN
     CREATE INDEX idx_distributions_user ON distributions(user_id);
   END IF;
 END $$;
-
--- Insert default notification templates
-INSERT INTO notification_templates (type, email_subject, email_body, telegram_message)
-VALUES
-  ('signal_triggered', 'High Risk Signal Detected',
-   '<h2>Signal Alert</h2><p>Game: {{gameId}}</p><p>Rigging Index: {{riggingIndex}}</p><p>Anomaly Score: {{anomalyScore}}</p>',
-   '🚨 <b>Signal Alert</b>\nGame: {{gameId}}\nRigging: {{riggingIndex}}\nAnomaly: {{anomalyScore}}'),
-
-  ('trade_completed', 'Trade Completed',
-   '<h2>Trade Completed</h2><p>Game: {{gameId}}</p><p>Profit: ${{profit}}</p>',
-   '✅ <b>Trade Completed</b>\nGame: {{gameId}}\nProfit: ${{profit}}'),
-
-  ('profit_distributed', 'Profit Distribution',
-   '<h2>Profit Distributed</h2><p>Total: ${{totalProfit}}</p><p>Your Share: ${{userReward}}</p>',
-   '💰 <b>Profit Distributed</b>\nTotal: ${{totalProfit}}\nYour Share: ${{userReward}}')
-ON CONFLICT (type) DO NOTHING;
 `;
 
 export async function initializeUserTables(db: any): Promise<void> {

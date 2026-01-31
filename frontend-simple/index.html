@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NBA Integrity Guard - Prediction Market Monitoring</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+            background: #020202;
+            color: #ffffff;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+        
+        /* Header */
+        header {
+            border-bottom: 1px solid rgba(191, 208, 219, 0.1);
+            padding: 20px 0;
+            position: sticky;
+            top: 0;
+            background: #020202;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 20px;
+            font-weight: 600;
+            color: #BFD0DB;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        nav {
+            display: flex;
+            gap: 32px;
+            align-items: center;
+        }
+        
+        nav a {
+            color: rgba(255, 255, 255, 0.6);
+            text-decoration: none;
+            font-size: 15px;
+            transition: color 0.2s;
+        }
+        
+        nav a:hover,
+        nav a.active {
+            color: #BFD0DB;
+        }
+        
+        /* Main Content */
+        main {
+            padding: 40px 0;
+            min-height: calc(100vh - 200px);
+        }
+        
+        .page-title {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #ffffff;
+        }
+        
+        .page-subtitle {
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 32px;
+            font-size: 16px;
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+        
+        .stat-card {
+            background: rgba(191, 208, 219, 0.03);
+            border: 1px solid rgba(191, 208, 219, 0.1);
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.2s;
+        }
+        
+        .stat-card:hover {
+            background: rgba(191, 208, 219, 0.05);
+            border-color: rgba(191, 208, 219, 0.2);
+        }
+        
+        .stat-label {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #BFD0DB;
+        }
+        
+        /* Markets Table */
+        .table-container {
+            background: rgba(191, 208, 219, 0.02);
+            border: 1px solid rgba(191, 208, 219, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 40px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        thead {
+            background: rgba(191, 208, 219, 0.03);
+            border-bottom: 1px solid rgba(191, 208, 219, 0.1);
+        }
+        
+        th {
+            padding: 16px 20px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.6);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        td {
+            padding: 20px;
+            border-bottom: 1px solid rgba(191, 208, 219, 0.05);
+            font-size: 15px;
+        }
+        
+        tr:last-child td {
+            border-bottom: none;
+        }
+        
+        tbody tr {
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+        
+        tbody tr:hover {
+            background: rgba(191, 208, 219, 0.03);
+        }
+        
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(191, 208, 219, 0.1);
+            color: #BFD0DB;
+            margin-right: 6px;
+        }
+        
+        .badge-success {
+            background: rgba(34, 197, 94, 0.1);
+            color: #22c55e;
+        }
+        
+        .badge-warning {
+            background: rgba(251, 191, 36, 0.1);
+            color: #fbbf24;
+        }
+        
+        /* Progress Bar */
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(191, 208, 219, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #BFD0DB;
+            transition: width 0.3s;
+        }
+        
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+        
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(3, end) infinite;
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+        
+        /* Footer */
+        footer {
+            border-top: 1px solid rgba(191, 208, 219, 0.1);
+            padding: 32px 0;
+            margin-top: 80px;
+        }
+        
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        .footer-links {
+            display: flex;
+            gap: 24px;
+        }
+        
+        .footer-links a {
+            color: rgba(255, 255, 255, 0.4);
+            text-decoration: none;
+            font-size: 13px;
+            transition: color 0.2s;
+        }
+        
+        .footer-links a:hover {
+            color: #BFD0DB;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            nav {
+                display: none;
+            }
+            
+            .table-container {
+                overflow-x: auto;
+            }
+        }
+        
+        /* Utilities */
+        .text-muted {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .text-success {
+            color: #22c55e;
+        }
+        
+        .text-danger {
+            color: #ef4444;
+        }
+        
+        .font-mono {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <a href="#" class="logo">
+                    <span>🏀</span>
+                    <span>NBA Integrity Guard</span>
+                </a>
+                <nav>
+                    <a href="#" class="active" onclick="showPage('dashboard')">Dashboard</a>
+                    <a href="#" onclick="showPage('alert')">Alert</a>
+                    <a href="#" onclick="showPage('governance')">Governance</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Dashboard Page -->
+        <div id="dashboard" class="page">
+            <h1 class="page-title">Dashboard</h1>
+            <p class="page-subtitle">Real-time market integrity monitoring</p>
+
+            <div class="stats-grid" id="dashboard-stats">
+                <div class="stat-card">
+                    <div class="stat-label">Total Volume</div>
+                    <div class="stat-value">$0.0M</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Active Markets</div>
+                    <div class="stat-value">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Liquidity</div>
+                    <div class="stat-value">$0.0M</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Alert Count</div>
+                    <div class="stat-value">0</div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 40px;">
+                <!-- Markets Table -->
+                <div>
+                    <h2 style="font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #BFD0DB;">Active Markets</h2>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Market</th>
+                                    <th>Volume</th>
+                                    <th>YES Price</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashboard-markets-tbody">
+                                <tr>
+                                    <td colspan="3" class="loading">Loading markets</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Top Traders -->
+                <div>
+                    <h2 style="font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #BFD0DB;">Top Traders</h2>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Trader</th>
+                                    <th>Score</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashboard-traders-tbody">
+                                <tr>
+                                    <td colspan="3" class="loading">Loading traders</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert Page -->
+        <div id="alert" class="page" style="display: none;">
+            <h1 class="page-title">Alert & Monitoring</h1>
+            <p class="page-subtitle">Anomaly detection and fraud risk assessment</p>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Description</th>
+                            <th>Risk Level</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alerts-tbody">
+                        <tr>
+                            <td colspan="5" class="loading">Loading alerts</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Governance Page -->
+        <div id="governance" class="page" style="display: none;">
+            <h1 class="page-title">Governance</h1>
+            <p class="page-subtitle">Protocol decisions and risk management</p>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Proposal</th>
+                            <th>Type</th>
+                            <th>For</th>
+                            <th>Against</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="governance-tbody">
+                        <tr>
+                            <td colspan="5" class="loading">Loading proposals</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-links">
+                    <a href="#">Documentation</a>
+                    <a href="#">API</a>
+                    <a href="#">Terms</a>
+                    <a href="#">Privacy</a>
+                </div>
+                <div class="text-muted" style="font-size: 13px;">
+                    © 2026 NBA Integrity Guard. All rights reserved.
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const API_BASE = 'http://localhost:3001/api';
+
+        // Mock Alerts Data (would come from backend in production)
+        const mockAlerts = [
+            { type: 'Large Trade', description: 'Unusual $850k trade detected on Lakers market', risk: 'High', time: '2 mins ago', status: 'Active' },
+            { type: 'Market Manipulation', description: 'Rapid price swing detected (-12% in 5 min)', risk: 'Critical', time: '8 mins ago', status: 'Investigating' },
+            { type: 'Counterparty Risk', description: 'Single address controls 35% of market liquidity', risk: 'Medium', time: '15 mins ago', status: 'Monitoring' },
+            { type: 'Sentiment Anomaly', description: 'Twitter sentiment diverged from market price', risk: 'Low', time: '1 hour ago', status: 'Resolved' },
+            { type: 'Wash Trading', description: 'Suspected circular trading pattern detected', risk: 'High', time: '2 hours ago', status: 'Active' }
+        ];
+
+        // Mock Governance Data
+        const mockProposals = [
+            { proposal: 'Ban address 0x1234... for repeated manipulation', type: 'Risk Management', forVotes: 850, againstVotes: 150, status: 'Active' },
+            { proposal: 'Increase minimum liquidity requirement to $100k', type: 'Market Parameters', forVotes: 620, againstVotes: 380, status: 'Active' },
+            { proposal: 'Upgrade reputation scoring algorithm v2.0', type: 'Protocol Upgrade', forVotes: 920, againstVotes: 80, status: 'Passed' },
+            { proposal: 'Enable automatic circuit breakers for -20% price swings', type: 'Risk Management', forVotes: 450, againstVotes: 550, status: 'Failed' }
+        ];
+
+        function showPage(page) {
+            document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+            document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+
+            document.getElementById(page).style.display = 'block';
+            event.target.classList.add('active');
+
+            if (page === 'dashboard') loadDashboard();
+            if (page === 'alert') loadAlerts();
+            if (page === 'governance') loadGovernance();
+        }
+
+        async function loadDashboard() {
+            try {
+                const [marketsRes, tradersRes] = await Promise.all([
+                    fetch(`${API_BASE}/markets`),
+                    fetch(`${API_BASE}/reputation/leaderboard`)
+                ]);
+
+                const marketsJson = await marketsRes.json();
+                const tradersJson = await tradersRes.json();
+
+                const markets = marketsJson.data;
+                const traders = tradersJson.data;
+
+                // Update stats
+                const totalVolume = markets.reduce((sum, m) => sum + m.volume, 0);
+                const totalLiquidity = markets.reduce((sum, m) => sum + m.liquidity, 0);
+                const alertCount = mockAlerts.filter(a => a.status === 'Active').length;
+
+                document.getElementById('dashboard-stats').innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-label">Total Volume</div>
+                        <div class="stat-value">$${(totalVolume / 1000000).toFixed(1)}M</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Active Markets</div>
+                        <div class="stat-value">${markets.length}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total Liquidity</div>
+                        <div class="stat-value">$${(totalLiquidity / 1000000).toFixed(1)}M</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Alert Count</div>
+                        <div class="stat-value text-danger">${alertCount}</div>
+                    </div>
+                `;
+
+                // Update markets table
+                document.getElementById('dashboard-markets-tbody').innerHTML = markets.slice(0, 5).map(m => `
+                    <tr>
+                        <td><strong>${m.question.length > 40 ? m.question.slice(0, 37) + '...' : m.question}</strong></td>
+                        <td class="font-mono">$${(m.volume / 1000000).toFixed(1)}M</td>
+                        <td><span class="text-success">${(m.yesPrice * 100).toFixed(0)}%</span></td>
+                    </tr>
+                `).join('');
+
+                // Update traders table
+                document.getElementById('dashboard-traders-tbody').innerHTML = traders.slice(0, 5).map((t, i) => `
+                    <tr>
+                        <td><strong style="color: ${i < 3 ? '#BFD0DB' : 'rgba(255,255,255,0.6)'};">#${i + 1}</strong></td>
+                        <td class="font-mono">${t.address.slice(0, 6)}...${t.address.slice(-4)}</td>
+                        <td><strong style="color: #BFD0DB;">${t.reputationScore}</strong></td>
+                    </tr>
+                `).join('');
+
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        function loadAlerts() {
+            const riskColors = {
+                'Critical': 'text-danger',
+                'High': '#ef4444',
+                'Medium': '#fbbf24',
+                'Low': 'rgba(255,255,255,0.6)'
+            };
+
+            document.getElementById('alerts-tbody').innerHTML = mockAlerts.map(a => `
+                <tr>
+                    <td><strong>${a.type}</strong></td>
+                    <td>${a.description}</td>
+                    <td><span style="color: ${riskColors[a.risk]};">${a.risk}</span></td>
+                    <td class="text-muted">${a.time}</td>
+                    <td>
+                        <span class="badge ${a.status === 'Active' ? 'badge-warning' : a.status === 'Resolved' ? 'badge-success' : ''}">${a.status}</span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function loadGovernance() {
+            document.getElementById('governance-tbody').innerHTML = mockProposals.map(p => {
+                const total = p.forVotes + p.againstVotes;
+                const forPercent = (p.forVotes / total * 100).toFixed(0);
+                const againstPercent = (p.againstVotes / total * 100).toFixed(0);
+
+                return `
+                    <tr>
+                        <td><strong>${p.proposal}</strong></td>
+                        <td class="text-muted">${p.type}</td>
+                        <td>
+                            <span class="text-success">${forPercent}%</span>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${forPercent}%; background: #22c55e;"></div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="text-danger">${againstPercent}%</span>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${againstPercent}%; background: #ef4444;"></div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge ${p.status === 'Active' ? 'badge-warning' : p.status === 'Passed' ? 'badge-success' : ''}">${p.status}</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Auto-load dashboard on page load
+        window.addEventListener('load', loadDashboard);
+    </script>
+</body>
+</html>

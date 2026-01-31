@@ -1,79 +1,172 @@
 version: '3.8'
 
 services:
+  # PostgreSQL 数据库
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
     container_name: nba-postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: nba_integrity_2025_secure
+      POSTGRES_DB: nba_integrity
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./backend/database:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - nba-network
 
-  redis:
-    image: redis:7
-    container_name: nba-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  twitter-monitor:
+  # Polymarket Indexer Service (3001)
+  polymarket-indexer:
     build:
-      context: ./backend/twitter-monitor
+      context: ./backend/polymarket-indexer
       dockerfile: Dockerfile
-    container_name: nba-twitter-monitor
+    container_name: nba-polymarket-indexer
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: postgresql://admin:nba_integrity_2025_secure@postgres:5432/nba_integrity
+      PORT: 3001
+      NODE_ENV: development
     depends_on:
       postgres:
         condition: service_healthy
-    env_file:
-      - .env
+    networks:
+      - nba-network
     restart: unless-stopped
 
-  market-watcher:
+  # Auth Service (3002)
+  auth-service:
     build:
-      context: ./backend/market-watcher
+      context: ./backend/auth-service
       dockerfile: Dockerfile
-    container_name: nba-market-watcher
+    container_name: nba-auth-service
+    ports:
+      - "3002:3002"
+    environment:
+      DATABASE_URL: postgresql://admin:nba_integrity_2025_secure@postgres:5432/nba_integrity
+      PORT: 3002
+      NODE_ENV: development
+      JWT_SECRET: your_jwt_secret_key_here
+      JWT_REFRESH_SECRET: your_refresh_secret_key_here
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-    env_file:
-      - .env
+    networks:
+      - nba-network
     restart: unless-stopped
 
-  strategy-engine:
+  # Notification Service (3003)
+  notification-service:
     build:
-      context: ./backend/strategy-engine
+      context: ./backend/notification-service
       dockerfile: Dockerfile
-    container_name: nba-strategy-engine
+    container_name: nba-notification-service
+    ports:
+      - "3003:3003"
+    environment:
+      DATABASE_URL: postgresql://admin:nba_integrity_2025_secure@postgres:5432/nba_integrity
+      PORT: 3003
+      NODE_ENV: development
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: your_email@gmail.com
+      SMTP_PASS: your_app_password
+      TELEGRAM_BOT_TOKEN: your_bot_token
+      TELEGRAM_CHAT_ID: your_chat_id
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-    env_file:
-      - .env
+    networks:
+      - nba-network
+    restart: unless-stopped
+
+  # Analytics Service (3004)
+  analytics-service:
+    build:
+      context: ./backend/analytics-service
+      dockerfile: Dockerfile
+    container_name: nba-analytics-service
     ports:
-      - "${STRATEGY_ENGINE_PORT}:3000"
+      - "3004:3004"
+    environment:
+      DATABASE_URL: postgresql://admin:nba_integrity_2025_secure@postgres:5432/nba_integrity
+      PORT: 3004
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - nba-network
+    restart: unless-stopped
+
+  # Reputation Service (3005)
+  reputation-service:
+    build:
+      context: ./backend/reputation-service
+      dockerfile: Dockerfile
+    container_name: nba-reputation-service
+    ports:
+      - "3005:3005"
+    environment:
+      DATABASE_URL: postgresql://admin:nba_integrity_2025_secure@postgres:5432/nba_integrity
+      PORT: 3005
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - nba-network
+    restart: unless-stopped
+
+  # Payment Service (3006)
+  payment-service:
+    build:
+      context: ./backend/payment-service
+      dockerfile: Dockerfile
+    container_name: nba-payment-service
+    ports:
+      - "3006:3006"
+    environment:
+      DATABASE_URL: postgresql://admin:nba_integrity_2025_secure@postgres:5432/nba_integrity
+      PORT: 3006
+      NODE_ENV: development
+      DATADANCE_API_KEY: your_datadance_api_key
+      DATADANCE_NETWORK: polygon-mainnet
+      ETH_RPC_URL: https://polygon-mainnet.infura.io/v3/
+      JWT_SECRET: your_jwt_secret_key_here
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - nba-network
+    restart: unless-stopped
+
+  # Frontend (3000)
+  frontend:
+    build:
+      context: ./frontend-web
+      dockerfile: Dockerfile
+    container_name: nba-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:3001
+    depends_on:
+      - polymarket-indexer
+    networks:
+      - nba-network
     restart: unless-stopped
 
 volumes:
   postgres_data:
-  redis_data:
+
+networks:
+  nba-network:
+    driver: bridge
