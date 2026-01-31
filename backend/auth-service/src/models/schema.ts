@@ -134,12 +134,14 @@ CREATE TABLE IF NOT EXISTS notification_templates (
 -- Add user_id to existing tables
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'trades' AND column_name = 'user_id'
-  ) THEN
-    ALTER TABLE trades ADD COLUMN user_id INTEGER REFERENCES users(id);
-    CREATE INDEX idx_trades_user ON trades(user_id);
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'trades') THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'trades' AND column_name = 'user_id'
+    ) THEN
+      ALTER TABLE trades ADD COLUMN user_id INTEGER REFERENCES users(id);
+      CREATE INDEX idx_trades_user ON trades(user_id);
+    END IF;
   END IF;
 
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'signal_logs') THEN
@@ -152,20 +154,24 @@ BEGIN
     END IF;
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'backtest_results' AND column_name = 'user_id'
-  ) THEN
-    ALTER TABLE backtest_results ADD COLUMN user_id INTEGER REFERENCES users(id);
-    CREATE INDEX idx_backtest_results_user ON backtest_results(user_id);
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'backtest_results') THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'backtest_results' AND column_name = 'user_id'
+    ) THEN
+      ALTER TABLE backtest_results ADD COLUMN user_id INTEGER REFERENCES users(id);
+      CREATE INDEX idx_backtest_results_user ON backtest_results(user_id);
+    END IF;
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'distributions' AND column_name = 'user_id'
-  ) THEN
-    ALTER TABLE distributions ADD COLUMN user_id INTEGER REFERENCES users(id);
-    CREATE INDEX idx_distributions_user ON distributions(user_id);
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'distributions') THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'distributions' AND column_name = 'user_id'
+    ) THEN
+      ALTER TABLE distributions ADD COLUMN user_id INTEGER REFERENCES users(id);
+      CREATE INDEX idx_distributions_user ON distributions(user_id);
+    END IF;
   END IF;
 END $$;
 `;
