@@ -75,6 +75,83 @@ CREATE TABLE IF NOT EXISTS distributions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Table: signal_ground_truth
+-- Stores ground truth labels for training ML models
+CREATE TABLE IF NOT EXISTS signal_ground_truth (
+    id SERIAL PRIMARY KEY,
+    signal_id INTEGER REFERENCES signal_logs(id),
+    game_id VARCHAR(100) NOT NULL,
+    rigging_index DECIMAL(5,4),
+    anomaly_score DECIMAL(5,4),
+
+    -- Label from human annotation
+    manual_label BOOLEAN,  -- TRUE: rigged/anomaly, FALSE: normal, NULL: unlabeled
+    labeler_address VARCHAR(100),  -- Address of person who labeled this
+    labeler_reputation INTEGER DEFAULT 0,  -- Reputation score of labeler at time of labeling
+    label_confidence DECIMAL(3,2),  -- 0.0 to 1.0, how confident the labeler is
+    label_notes TEXT,  -- Optional notes from labeler
+
+    -- System validation
+    actual_outcome BOOLEAN,  -- Ground truth after game resolution
+    validation_source VARCHAR(50),  -- 'oracle', 'manual', 'consensus', etc.
+
+    -- Metadata
+    timestamp TIMESTAMP NOT NULL,
+    labeled_at TIMESTAMP,
+    resolved_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table: model_versions
+-- Tracks different versions of ML models
+CREATE TABLE IF NOT EXISTS model_versions (
+    id SERIAL PRIMARY KEY,
+    model_name VARCHAR(100) NOT NULL,  -- e.g., 'random_forest_v1'
+    model_type VARCHAR(50) NOT NULL,  -- 'random_forest', 'gradient_boost', etc.
+
+    version_number INTEGER NOT NULL,
+
+    -- Training metadata
+    training_data_count INTEGER NOT NULL,
+    training_accuracy DECIMAL(5,4),
+    training_precision DECIMAL(5,4),
+    training_recall DECIMAL(5,4),
+    training_f1_score DECIMAL(5,4),
+
+    -- Model info
+    hyperparameters JSONB,  -- Serialized hyperparameters
+    feature_list JSONB,  -- List of features used
+    model_path VARCHAR(500),  -- Path to saved model file
+
+    -- Performance tracking
+    validation_accuracy DECIMAL(5,4),
+    validation_f1_score DECIMAL(5,4),
+
+    is_active BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deployed_at TIMESTAMP
+);
+
+-- Table: model_predictions
+-- Stores predictions made by ML models
+CREATE TABLE IF NOT EXISTS model_predictions (
+    id SERIAL PRIMARY KEY,
+    signal_id INTEGER REFERENCES signal_logs(id),
+    model_version_id INTEGER REFERENCES model_versions(id),
+
+    -- Prediction
+    predicted_label BOOLEAN,  -- TRUE: rigged/anomaly, FALSE: normal
+    prediction_probability DECIMAL(5,4),  -- 0.0 to 1.0
+    confidence DECIMAL(5,4),
+
+    -- Features used
+    features JSONB,  -- Actual feature values used for prediction
+
+    timestamp TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes for performance
 CREATE INDEX idx_twitter_game_id ON twitter_data(game_id);
 CREATE INDEX idx_twitter_timestamp ON twitter_data(timestamp);
@@ -83,3 +160,237 @@ CREATE INDEX idx_market_timestamp ON market_data(timestamp);
 CREATE INDEX idx_trades_status ON trades(status);
 CREATE INDEX idx_trades_timestamp ON trades(timestamp);
 CREATE INDEX idx_signal_timestamp ON signal_logs(timestamp);
+
+-- New indexes for ML/labeling
+CREATE INDEX idx_ground_truth_signal_id ON signal_ground_truth(signal_id);
+CREATE INDEX idx_ground_truth_game_id ON signal_ground_truth(game_id);
+CREATE INDEX idx_ground_truth_labeled ON signal_ground_truth(manual_label) WHERE manual_label IS NOT NULL;
+CREATE INDEX idx_ground_truth_unlabeled ON signal_ground_truth(game_id) WHERE manual_label IS NULL;
+CREATE INDEX idx_ground_truth_labeler ON signal_ground_truth(labeler_address);
+
+CREATE INDEX idx_model_versions_active ON model_versions(is_active);
+CREATE INDEX idx_model_versions_name ON model_versions(model_name);
+
+CREATE INDEX idx_model_predictions_signal ON model_predictions(signal_id);
+CREATE INDEX idx_model_predictions_model ON model_predictions(model_version_id);
+CREATE INDEX idx_model_predictions_timestamp ON model_predictions(timestamp);
+
+-- =============================================================================
+-- Phase 3: Polymarket Integration & User System
+-- =============================================================================
+
+-- Table: events
+-- Stores Polymarket events
+CREATE TABLE IF NOT EXISTS events (
+  id SERIAL PRIMARY KEY,
+  slug VARCHAR(500) UNIQUE NOT NULL,
+  title VARCHAR(500),
+  description TEXT,
+
+  -- Metadata
+  category VARCHAR(100),
+  image_url VARCHAR(500),
+
+  -- Risk model
+  enable_neg_risk BOOLEAN DEFAULT FALSE,
+
+  -- Status
+  status VARCHAR(50) DEFAULT 'active',  -- 'active', 'resolved', 'closed'
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Table: markets
+-- Stores Polymarket markets
+CREATE TABLE IF NOT EXISTS markets (
+  id SERIAL PRIMARY KEY,
+  event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
+  slug VARCHAR(500) UNIQUE NOT NULL,
+
+  -- Blockchain params (from Market Decoder)
+  condition_id VARCHAR(66) UNIQUE NOT NULL,  -- 0x + 64 hex chars
+  question_id VARCHAR(66) NOT NULL,
+  oracle VARCHAR(42) NOT NULL,
+  collateral_token VARCHAR(42) NOT NULL,
+
+  -- Token IDs (calculated from condition_id)
+  yes_token_id VARCHAR(78) NOT NULL,  -- 0x + 76 hex (uint256 as hex)
+  no_token_id VARCHAR(78) NOT NULL,
+
+  -- Market metadata
+  question TEXT,
+  outcome_slot_count INTEGER DEFAULT 2,
+
+  -- Status
+  status VARCHAR(50) DEFAULT 'active',
+  enable_order_book BOOLEAN DEFAULT TRUE,
+
+  -- Timestamps
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  closed_at TIMESTAMP,
+  resolved_at TIMESTAMP
+);
+
+-- Table: pm_trades (Polymarket trades, renamed to avoid conflict with existing trades table)
+-- Stores Polymarket OrderFilled events
+CREATE TABLE IF NOT EXISTS pm_trades (
+  id SERIAL PRIMARY KEY,
+  market_id INTEGER NOT NULL REFERENCES markets(id) ON DELETE CASCADE,
+  user_id INTEGER,  -- Reference to users table, added later
+
+  -- Blockchain data (from Trade Decoder)
+  tx_hash VARCHAR(66) NOT NULL,
+  log_index INTEGER NOT NULL,
+  block_number INTEGER NOT NULL,
+  block_timestamp TIMESTAMP NOT NULL,
+
+  -- Exchange info
+  exchange VARCHAR(42) NOT NULL,
+  order_hash VARCHAR(66),
+
+  -- Parties
+  maker VARCHAR(42) NOT NULL,
+  taker VARCHAR(42) NOT NULL,
+
+  -- Assets
+  maker_asset_id VARCHAR(78) NOT NULL,
+  taker_asset_id VARCHAR(78) NOT NULL,
+  maker_amount VARCHAR(100) NOT NULL,  -- Wei format
+  taker_amount VARCHAR(100) NOT NULL,
+  fee VARCHAR(100) DEFAULT '0',
+
+  -- Computed fields
+  price DECIMAL(18,6) NOT NULL,
+  size DECIMAL(18,6) NOT NULL,
+  side VARCHAR(10) NOT NULL,  -- 'BUY' or 'SELL'
+  outcome VARCHAR(10) NOT NULL,  -- 'YES' or 'NO'
+  token_id VARCHAR(78) NOT NULL,
+
+  -- Metadata
+  created_at TIMESTAMP DEFAULT NOW(),
+
+  UNIQUE(tx_hash, log_index)  -- Prevent duplicates (idempotency)
+);
+
+-- Table: sync_state
+-- Tracks blockchain sync progress
+CREATE TABLE IF NOT EXISTS sync_state (
+  id SERIAL PRIMARY KEY,
+  key VARCHAR(100) UNIQUE NOT NULL,  -- 'market_sync', 'trade_sync', etc.
+  last_block INTEGER NOT NULL,
+  last_block_hash VARCHAR(66),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Table: users
+-- User accounts
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  username VARCHAR(100) UNIQUE NOT NULL,
+
+  -- Authentication
+  password_hash VARCHAR(255),
+  wallet_address VARCHAR(255) UNIQUE,
+
+  -- Profile
+  full_name VARCHAR(255),
+  avatar_url VARCHAR(500),
+  bio TEXT,
+
+  -- Settings
+  theme VARCHAR(20) DEFAULT 'dark',
+  language VARCHAR(10) DEFAULT 'en',
+  notification_settings JSONB DEFAULT '{"email": true, "telegram": false, "discord": false}',
+
+  -- Timestamps
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  last_login TIMESTAMP,
+
+  is_active BOOLEAN DEFAULT TRUE,
+  is_verified BOOLEAN DEFAULT FALSE
+);
+
+-- Table: sessions
+-- User sessions (JWT)
+CREATE TABLE IF NOT EXISTS sessions (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  token VARCHAR(500) UNIQUE NOT NULL,
+  refresh_token VARCHAR(500) UNIQUE NOT NULL,
+
+  created_at TIMESTAMP DEFAULT NOW(),
+  expires_at TIMESTAMP NOT NULL,
+
+  ip_address VARCHAR(50),
+  user_agent TEXT,
+
+  is_active BOOLEAN DEFAULT TRUE
+);
+
+-- Table: user_strategies
+-- User strategy configurations
+CREATE TABLE IF NOT EXISTS user_strategies (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+
+  -- Parameters
+  rigging_threshold DECIMAL(5,4) DEFAULT 0.65,
+  anomaly_threshold DECIMAL(5,4) DEFAULT 0.75,
+  max_position_size DECIMAL(15,2) DEFAULT 1000.00,
+  risk_per_trade DECIMAL(5,4) DEFAULT 0.02,
+
+  -- Status
+  is_active BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+
+  UNIQUE(user_id, name)
+);
+
+-- Table: notifications
+-- User notifications
+CREATE TABLE IF NOT EXISTS notifications (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  type VARCHAR(50) NOT NULL,  -- 'signal', 'trade', 'profit', 'alert'
+  title VARCHAR(255) NOT NULL,
+  message TEXT,
+
+  data JSONB DEFAULT '{}',
+
+  read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Indexes for Polymarket tables
+CREATE INDEX idx_events_slug ON events(slug);
+CREATE INDEX idx_events_status ON events(status);
+
+CREATE INDEX idx_markets_condition_id ON markets(condition_id);
+CREATE INDEX idx_markets_slug ON markets(slug);
+CREATE INDEX idx_markets_yes_token ON markets(yes_token_id);
+CREATE INDEX idx_markets_no_token ON markets(no_token_id);
+
+CREATE INDEX idx_pm_trades_market ON pm_trades(market_id);
+CREATE INDEX idx_pm_trades_tx_hash ON pm_trades(tx_hash);
+CREATE INDEX idx_pm_trades_block ON pm_trades(block_number);
+CREATE INDEX idx_pm_trades_timestamp ON pm_trades(block_timestamp);
+CREATE INDEX idx_pm_trades_token ON pm_trades(token_id);
+
+-- Indexes for user tables
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_wallet ON users(wallet_address);
+
+CREATE INDEX idx_sessions_user ON sessions(user_id);
+CREATE INDEX idx_sessions_token ON sessions(token);
+
+CREATE INDEX idx_notifications_user ON notifications(user_id);
+CREATE INDEX idx_notifications_read ON notifications(read);
